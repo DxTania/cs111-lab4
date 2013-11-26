@@ -768,6 +768,7 @@ int main(int argc, char *argv[])
 				_exit(0);
 			} else if (pid < 0) {
 				error("Fork failed");
+				exit(0);
 			}
 		}
 	}
@@ -777,8 +778,10 @@ int main(int argc, char *argv[])
 		pid_t pid = fork();
 		if (pid == 0) {
 			task_upload(t);
+			_exit(0);
 		} else if (pid < 0) {
 			error("Fork failed");
+			exit(0);
 		}
 	}
 
