@@ -37,6 +37,7 @@ static int listen_port;
 
 #define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
+#define MAXDLSIZE   (1 << 28) // TODO: what should this actually be?
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -583,6 +584,12 @@ static void task_download(task_t *t, task_t *tracker_task)
 			error("* Disk write error");
 			goto try_again;
 		}
+
+		// Task 2: max file size
+		if (t->total_written > MAXDLSIZE) {
+			error("* File size too large");
+			goto try_again;
+		}
 	}
 
 	// Empty files are usually a symptom of some error.
@@ -656,6 +663,12 @@ static void task_upload(task_t *t)
 			break;
 	}
 
+	// Task 2: Buffer overflow
+	if (strlen(t->buf) > FILENAMESIZ) {
+		error("* File name too long for upload");
+		goto exit;
+	}
+
 	assert(t->head == 0);
 	if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
 		error("* Odd request %.*s\n", t->tail, t->buf);
@@ -663,11 +676,41 @@ static void task_upload(task_t *t)
 	}
 	t->head = t->tail = 0;
 
-	// TODO: Task 2: 
-	// File must be in current directory
-	// Check if file & directory exists
-	// What about really big files?
+	// Task 2: Defensive Programming
 
+	// No absolute path or home
+	if (t->filename[0] == '/' || ((t->filename[0] == '~') &&
+			(t->filename[1] == '/' || t->filename[1] == '\0'))) {
+		error("* Tried to access upper directories");
+		goto exit;
+	}
+
+	// TODO: check for ../ type accessing
+	char* iterator = t->filename;
+	while(*iterator != '\0') {
+
+	}
+
+	char buf[PATH_MAX];
+	char fbuf[PATH_MAX];
+	char* curdir = getcwd(buf, PATH_MAX);
+	char* real_path = realpath(t->filename, fbuf);
+
+	// File exists
+	struct stat data;
+	if (stat(real_path, &data) < 0) {
+		errno = ENOENT;
+		error("* File doesn't exist");
+		goto exit;
+	}
+
+	// File in current directory
+	if (strncmp(curdir, real_path, strlen(curdir))) {
+		errno = ENOENT;
+		error("* File not in current directory");
+		goto exit;
+	}
+	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
