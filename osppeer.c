@@ -823,7 +823,7 @@ int main(int argc, char *argv[])
 	// First, download files named on command line.
 	for (; argc > 1; argc--, argv++) {
 		if ((t = start_download(tracker_task, argv[1]))) {
-			// Task 1: Parallel downloads
+			// Task 1: Parallel downloads works
 			pid_t pid = fork();
 			if (pid == 0) {
 				task_download(t, tracker_task);
@@ -838,14 +838,15 @@ int main(int argc, char *argv[])
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task))) {
 		// Task 1: Parallel uploads
-		pid_t pid = fork();
-		if (pid == 0) {
+		// TODO: CHECKUPLOAD fails when forking (empty file?)
+		// pid_t pid = fork();
+		// if (pid == 0) {
 			task_upload(t);
-			_exit(0);
-		} else if (pid < 0) {
-			error("Fork failed");
-			exit(0);
-		}
+		// 	_exit(0);
+		// } else if (pid < 0) {
+		// 	error("Fork failed");
+		// 	exit(0);
+		// }
 	}
 
 	return 0;
