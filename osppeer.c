@@ -686,10 +686,10 @@ static void task_upload(task_t *t)
 	}
 
 	// TODO: check for ../ type accessing
-	char* iterator = t->filename;
-	while(*iterator != '\0') {
+	// char* iterator = t->filename;
+	// while(*iterator != '\0') {
 
-	}
+	// }
 
 	char buf[PATH_MAX];
 	char fbuf[PATH_MAX];
