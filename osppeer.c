@@ -824,6 +824,7 @@ int main(int argc, char *argv[])
 	for (; argc > 1; argc--, argv++) {
 		if ((t = start_download(tracker_task, argv[1]))) {
 			// Task 1: Parallel downloads works
+			// Although maybe we should do this a different way
 			pid_t pid = fork();
 			if (pid == 0) {
 				task_download(t, tracker_task);
