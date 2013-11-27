@@ -476,7 +476,14 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 		error("* Error while allocating task");
 		goto exit;
 	}
-	strcpy(t->filename, filename);
+
+	// Task 2: buffer overflow?
+	unsigned int length = strlen(filename);
+	if (length > FILENAMESIZ) {
+		length = FILENAMESIZ;
+	}
+	//strcpy(t->filename, filename);
+	strncpy(t->filename, filename, length);
 
 	// add peers
 	s1 = tracker_task->buf;
@@ -527,13 +534,20 @@ static void task_download(task_t *t, task_t *tracker_task)
 	}
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
+	// Task 2: buffer overflow?
+	unsigned int length = strlen(t->filename);
+	if (length > FILENAMESIZ) {
+		length = FILENAMESIZ;
+	}
+
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
 	// "foo.txt~1~".  However, if there are 50 local files, don't download
 	// at all.
 	for (i = 0; i < 50; i++) {
 		if (i == 0)
-			strcpy(t->disk_filename, t->filename);
+			//strcpy(t->disk_filename, t->filename);
+			strncpy(t->disk_filename, t->filename, length);
 		else
 			sprintf(t->disk_filename, "%s~%d~", t->filename, i);
 		t->disk_fd = open(t->disk_filename,
@@ -649,6 +663,11 @@ static void task_upload(task_t *t)
 	}
 	t->head = t->tail = 0;
 
+	// TODO: Task 2: 
+	// File must be in current directory
+	// Check if file & directory exists
+	// What about really big files?
+
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
@@ -761,7 +780,7 @@ int main(int argc, char *argv[])
 	// First, download files named on command line.
 	for (; argc > 1; argc--, argv++) {
 		if ((t = start_download(tracker_task, argv[1]))) {
-			// Parallel downloads
+			// Task 1: Parallel downloads
 			pid_t pid = fork();
 			if (pid == 0) {
 				task_download(t, tracker_task);
@@ -775,6 +794,7 @@ int main(int argc, char *argv[])
 
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task))) {
+		// Task 1: Parallel uploads
 		pid_t pid = fork();
 		if (pid == 0) {
 			task_upload(t);
