@@ -18,7 +18,7 @@ Student ID: 704018998
 Email: rawrtan@gmail.com
 
 # Partner 2 (if you're working in a team)
-Name: Charly Sotelo
+Name: Carlos Sotelo
 Student ID: 303891983
 Email: charlysotelo@hotmail.com 
 
