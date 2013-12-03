@@ -36,9 +36,10 @@ static int listen_port;
  * a bounded buffer that simplifies reading from and writing to peers.
  */
 
-#define TASKBUFSIZ	65536	// Size of task_t::buf
-#define FILENAMESIZ	256	// Size of task_t::filename
+#define TASKBUFSIZ	65536			// Size of task_t::buf
+#define FILENAMESIZ	256				// Size of task_t::filename
 #define MAXDLSIZE   (1 << 28) // TODO: what should this actually be?
+#define MAXFDS      1000      // Max number of file descriptors
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -774,8 +775,8 @@ static void task_upload(task_t *t)
 
 	message("* Upload of %s complete\n", t->filename);
 
-    exit:
-	task_free(t);
+  exit:
+		task_free(t);
 }
 
 
@@ -861,7 +862,6 @@ int main(int argc, char *argv[])
 	for (; argc > 1; argc--, argv++) {
 		if ((t = start_download(tracker_task, argv[1]))) {
 			// Task 1: Parallel downloads works
-			// Although maybe we should do this a different way
 			pid_t pid = fork();
 			if (pid == 0) {
 				task_download(t, tracker_task);
@@ -874,21 +874,24 @@ int main(int argc, char *argv[])
 	}
 
 	// Then accept connections from other peers and upload files to them!
-	while ((t = task_listen(listen_task))) 
-	{
-		// Task 1: Parallel uploads
-		// TODO: CHECKUPLOAD fails when forking (empty file?)
-		// Maybe we need to use threads here instead of processes.
-		// i think creating a new process means that we use a different
-		// port number, which our peer tries to contact later, but does
-		// it cant beacuse it doesnt exist anymore
-		//pthread_t thread;
-		//int status1;
-		task_upload(t);
-		//status1 = pthread_create( &thread, NULL,(void *)task_upload,(void *)t);
-		//printf("tasklistned\n");
-		//pthread_join( thread, NULL);
-	}
+	int fds = 0;
+  while ((t = task_listen(listen_task))) {
+    // Task 1: Parallel uploads works now
+    if (fds > MAXFDS) {
+      die("too many requests for file descriptors\n");
+    }
+    pid_t pid = fork();
+    if (pid == 0) {
+      task_upload(t);
+      _exit(0);
+    } else if (pid < 0) {
+      error("Fork failed");
+      exit(0);
+    } else {
+    	task_free(t);
+    	fds += 2;
+    }
+  }
 
 	return 0;
 }
