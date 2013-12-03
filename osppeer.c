@@ -20,6 +20,7 @@
 #include <pwd.h>
 #include <time.h>
 #include <limits.h>
+#include <pthread.h>
 #include "md5.h"
 #include "osp2p.h"
 
@@ -35,7 +36,7 @@ static int listen_port;
  * a bounded buffer that simplifies reading from and writing to peers.
  */
 
-#define TASKBUFSIZ	4096	// Size of task_t::buf
+#define TASKBUFSIZ	65536	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 #define MAXDLSIZE   (1 << 28) // TODO: what should this actually be?
 
@@ -343,6 +344,7 @@ task_t *start_tracker(struct in_addr addr, int port)
 	}
 
 	// Collect the tracker's greeting.
+	//printf("start tracker\n");
 	messagepos = read_tracker_response(tracker_task);
 	message("* Tracker's greeting:\n%s", &tracker_task->buf[messagepos]);
 
@@ -430,6 +432,25 @@ static void register_files(task_t *tracker_task, const char *myalias)
 	}
 
 	closedir(dir);
+
+	if(evil_mode)
+	//register as many bogus files as we can so that we fish for as many
+	//peers as we can. Try to lure them in with files that we do not have
+	{
+		//printf("registering evil files\n");
+		char baitFile[256] = "SexyAttractiveFile0.jpg";
+		int i;
+		baitFile[18]--;
+		for(i = 0 ; i < 10; i++)
+		{
+			baitFile[18] += 1; 
+			printf("registering file %s\n",baitFile);	
+			osp2p_writef(tracker_task->peer_fd, "HAVE %s\n",baitFile);
+			messagepos = read_tracker_response(tracker_task);
+			if(tracker_task->buf[messagepos] != '2')
+				error("* Tracker error message while registering EVIL files '%s':\n%s",baitFile, &tracker_task->buf[messagepos]);
+		}
+	}
 }
 
 
@@ -466,7 +487,11 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	message("* Finding peers for '%s'\n", filename);
 
 	osp2p_writef(tracker_task->peer_fd, "WANT %s\n", filename);
+	//printf("calling read_tracker_response from start dl\n");
 	messagepos = read_tracker_response(tracker_task);
+
+	//message("* Tracker's response to startdl :\n%s",
+	//	&tracker_task->buf[messagepos]);
 	if (tracker_task->buf[messagepos] != '2') {
 		error("* Tracker error message while requesting '%s':\n%s",
 		      filename, &tracker_task->buf[messagepos]);
@@ -601,6 +626,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		if (strcmp(t->filename, t->disk_filename) == 0) {
 			osp2p_writef(tracker_task->peer_fd, "HAVE %s\n",
 				     t->filename);
+			//printf("callling read tracker resp from dl\n");
 			(void) read_tracker_response(tracker_task);
 		}
 		task_free(t);
@@ -696,6 +722,16 @@ static void task_upload(task_t *t)
 	char* curdir = getcwd(buf, PATH_MAX);
 	char* real_path = realpath(t->filename, fbuf);
 
+	if(evil_mode)
+	{
+		//we might have successfully fished someone. Pretend we have the file.
+		//fill the file with a lot of bogus maybe?
+		//
+
+		//better yet dont respond at all. let them hang
+		return;	
+	}
+
 	// File exists
 	struct stat data;
 	if (stat(real_path, &data) < 0) {
@@ -719,7 +755,8 @@ static void task_upload(task_t *t)
 
 	message("* Transferring file %s\n", t->filename);
 	// Now, read file from disk and write it to the requesting peer.
-	while (1) {
+	while (1) 
+	{
 		int ret = write_from_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Peer write error");
@@ -837,17 +874,20 @@ int main(int argc, char *argv[])
 	}
 
 	// Then accept connections from other peers and upload files to them!
-	while ((t = task_listen(listen_task))) {
+	while ((t = task_listen(listen_task))) 
+	{
 		// Task 1: Parallel uploads
 		// TODO: CHECKUPLOAD fails when forking (empty file?)
-		// pid_t pid = fork();
-		// if (pid == 0) {
-			task_upload(t);
-		// 	_exit(0);
-		// } else if (pid < 0) {
-		// 	error("Fork failed");
-		// 	exit(0);
-		// }
+		// Maybe we need to use threads here instead of processes.
+		// i think creating a new process means that we use a different
+		// port number, which our peer tries to contact later, but does
+		// it cant beacuse it doesnt exist anymore
+		//pthread_t thread;
+		//int status1;
+		task_upload(t);
+		//status1 = pthread_create( &thread, NULL,(void *)task_upload,(void *)t);
+		//printf("tasklistned\n");
+		//pthread_join( thread, NULL);
 	}
 
 	return 0;
