@@ -705,18 +705,21 @@ static void task_upload(task_t *t)
 
 	// Task 2: Defensive Programming
 
-	// No absolute path or home
+	// No absolute path or home or ../ type access
 	if (t->filename[0] == '/' || ((t->filename[0] == '~') &&
 			(t->filename[1] == '/' || t->filename[1] == '\0'))) {
 		error("* Tried to access upper directories");
 		goto exit;
 	}
 
-	// TODO: check for ../ type accessing
-	// char* iterator = t->filename;
-	// while(*iterator != '\0') {
-
-	// }
+	int i = 0;
+	while(t->filename[i] != '\0') {
+		if (i > 0 && t->filename[i] == '.' && t->filename[i-1] == '.') {
+			error("* Tried to access upper directories");
+			goto exit;
+		}
+		i++;
+	}
 
 	char buf[PATH_MAX];
 	char fbuf[PATH_MAX];
