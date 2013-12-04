@@ -458,6 +458,15 @@ static void register_files(task_t *tracker_task, const char *myalias)
 			if(tracker_task->buf[messagepos] != '2')
 				error("* Tracker error message while registering EVIL files '%s':\n%s",baitFile, &tracker_task->buf[messagepos]);
 		}
+
+		//One more for fun.
+		strcpy(baitFile,"GTAV-PCVERSIONOMG.iso");
+		printf("registering file %s\n",baitFile);	
+		osp2p_writef(tracker_task->peer_fd, "HAVE %s\n",baitFile);
+		messagepos = read_tracker_response(tracker_task);
+		if(tracker_task->buf[messagepos] != '2')
+				error("* Tracker error message while registering EVIL files '%s':\n%s",baitFile, &tracker_task->buf[messagepos]);
+	
 	}
 }
 
