@@ -48,6 +48,11 @@ longer than FILENAMESIZ.
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
+1. Sent very large filename download requests to peers, such to cause a buffer overflow. This will very likely cause a crash on the other peer's client.
+
+2. When uploading a file, keep sending bogus data and never reach the end of the file. Since we can assume the peer's client operates sequentially, we are effectievely wasting the peers time, and resources.
+
+3. Added "attractive" fake files to the tracker we are currently connected to - as to attract more peers, which we can damage using attack number 2.
 # Extra credit problems
 #Extra credit problem: none
 
