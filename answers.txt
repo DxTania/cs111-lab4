@@ -39,6 +39,12 @@ longer than FILENAMESIZ.
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
 
+1. Prevent absolute paths(/), home(~) access, and (../) type access.
+
+2. Prevent upload of overly large files.
+
+3. Prevent too many connections by limiting file descriptors to 1000.
+
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
