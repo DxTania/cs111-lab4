@@ -869,6 +869,8 @@ int main(int argc, char *argv[])
 			} else if (pid < 0) {
 				error("Fork failed");
 				exit(0);
+			} else {
+				task_free(t);
 			}
 		}
 	}
